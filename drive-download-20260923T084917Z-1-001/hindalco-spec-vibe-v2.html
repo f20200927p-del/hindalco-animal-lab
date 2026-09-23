@@ -1,0 +1,1024 @@
+<title>Spec to Vibe</title>
+<meta name="description" content="Hindalco AI Engineer Program, Day 3 and 4: why specs matter now, the layers of spec-driven development, and how one Cline prompt builds our image classifier before we take it to production.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#eef2f4; --surface:#ffffff; --surface-2:#e3e9ed; --surface-3:#d7e0e5;
+  --ink:#10202c; --ink-soft:#4c6270; --ink-faint:#7e919b;
+  --line:#c7d4da;
+  --blueprint:#123a5c; --blueprint-2:#1c5686; --blueprint-ink:#eaf3fb;
+  --copper:#c8500f; --copper-strong:#a8420c; --copper-soft:#f0a468; --copper-wash:#fbe6d3;
+  --cyan:#1f8f8a; --cyan-soft:#bfe6e3;
+  --good:#2f7d4f; --warn:#b3760a;
+  --shadow: 0 1px 2px rgba(16,32,44,.06), 0 8px 24px rgba(16,32,44,.06);
+  --radius: 14px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0a141c; --surface:#101f2a; --surface-2:#152a37; --surface-3:#1b3444;
+    --ink:#e8eef1; --ink-soft:#a9bdc7; --ink-faint:#7891a0;
+    --line:#274051;
+    --blueprint:#0d2740; --blueprint-2:#154060; --blueprint-ink:#eaf3fb;
+    --copper:#ef8a45; --copper-strong:#ffab6b; --copper-soft:#8a4c1f; --copper-wash:#2a1c10;
+    --cyan:#4fd1c5; --cyan-soft:#123632;
+    --good:#4fbd79; --warn:#e0aa3a;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 12px 32px rgba(0,0,0,.35);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0a141c; --surface:#101f2a; --surface-2:#152a37; --surface-3:#1b3444;
+  --ink:#e8eef1; --ink-soft:#a9bdc7; --ink-faint:#7891a0;
+  --line:#274051;
+  --blueprint:#0d2740; --blueprint-2:#154060; --blueprint-ink:#eaf3fb;
+  --copper:#ef8a45; --copper-strong:#ffab6b; --copper-soft:#8a4c1f; --copper-wash:#2a1c10;
+  --cyan:#4fd1c5; --cyan-soft:#123632;
+  --good:#4fbd79; --warn:#e0aa3a;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 12px 32px rgba(0,0,0,.35);
+}
+
+*{box-sizing:border-box;}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:'Public Sans',system-ui,sans-serif;
+  line-height:1.55; -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,h4{font-family:'Archivo',system-ui,sans-serif; text-wrap:balance; margin:0; color:var(--ink);}
+p{margin:0;}
+.wrap{max-width:1040px; margin:0 auto; padding-inline:20px;}
+.mono{font-family:'IBM Plex Mono',monospace;}
+.eyebrow{
+  font-family:'IBM Plex Mono',monospace; font-size:12.5px; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--copper); font-weight:600; display:flex; align-items:center; gap:8px;
+}
+.eyebrow::before{content:""; width:18px; height:2px; background:var(--copper); display:inline-block;}
+section{padding-block:64px;}
+.section-head{max-width:700px; margin-bottom:36px;}
+.section-head h2{font-size:clamp(26px,4vw,36px); margin-top:10px;}
+.section-head .sub{margin-top:12px; color:var(--ink-soft); font-size:16px;}
+
+/* ---------- NAV ---------- */
+.topnav{
+  position:sticky; top:env(safe-area-inset-top,0px); z-index:50;
+  background:color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter:blur(10px); border-bottom:1px solid var(--line);
+}
+.topnav-inner{
+  max-width:1040px; margin:0 auto; padding:10px 20px;
+  display:flex; align-items:center; gap:18px; overflow-x:auto; scrollbar-width:none;
+}
+.topnav-inner::-webkit-scrollbar{display:none;}
+.brand{font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:13px; white-space:nowrap; color:var(--ink); display:flex; align-items:center; gap:8px; flex:none;}
+.brand .dot{width:8px;height:8px;border-radius:50%;background:var(--copper);}
+.navlinks{display:flex; gap:4px; flex:none;}
+.navlinks a{
+  font-size:13px; color:var(--ink-soft); text-decoration:none; padding:7px 10px; border-radius:999px;
+  white-space:nowrap; font-weight:500;
+}
+.navlinks a.active{background:var(--surface-3); color:var(--ink);}
+.navprogress{margin-left:auto; flex:none; display:flex; align-items:center; gap:8px; font-size:12px; color:var(--ink-faint); font-family:'IBM Plex Mono',monospace;}
+.ring{width:22px;height:22px;border-radius:50%; background:
+  conic-gradient(var(--copper) calc(var(--pct,0) * 1%), var(--line) 0);
+  flex:none;}
+
+/* ---------- HERO ---------- */
+.hero{
+  position:relative; overflow:hidden; background:var(--blueprint); color:var(--blueprint-ink);
+  padding-block:72px 88px;
+}
+.hero::before{
+  content:""; position:absolute; inset:0;
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--blueprint-ink) 8%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--blueprint-ink) 8%, transparent) 1px, transparent 1px);
+  background-size:34px 34px;
+  mask-image:radial-gradient(ellipse 80% 70% at 50% 20%, black 40%, transparent 85%);
+}
+.hero-inner{position:relative;}
+.title-block{
+  border:1px solid color-mix(in srgb, var(--blueprint-ink) 30%, transparent);
+  border-radius:10px; padding:22px 24px; position:relative;
+}
+.corner{position:absolute; width:16px; height:16px; border:2px solid var(--cyan);}
+.corner.tl{top:-2px; left:-2px; border-right:none; border-bottom:none;}
+.corner.tr{top:-2px; right:-2px; border-left:none; border-bottom:none;}
+.corner.bl{bottom:-2px; left:-2px; border-right:none; border-top:none;}
+.corner.br{bottom:-2px; right:-2px; border-left:none; border-top:none;}
+.hero .eyebrow{color:var(--cyan);}
+.hero .eyebrow::before{background:var(--cyan);}
+.hero h1{font-size:clamp(32px,5.4vw,52px); margin-top:14px; letter-spacing:-.01em; color:var(--blueprint-ink);}
+.hero h1 em{font-style:normal; color:var(--copper-soft);}
+.hero .lede{margin-top:18px; max-width:640px; font-size:17px; color:color-mix(in srgb, var(--blueprint-ink) 82%, transparent);}
+.hero blockquote{
+  margin-top:26px; padding-left:16px; border-left:3px solid var(--copper-soft);
+  font-family:'IBM Plex Mono',monospace; font-size:14px; line-height:1.7;
+  color:color-mix(in srgb, var(--blueprint-ink) 90%, transparent); max-width:560px;
+}
+.hero-meta{display:flex; gap:22px; margin-top:30px; flex-wrap:wrap;}
+.hero-meta .m{font-family:'IBM Plex Mono',monospace; font-size:12px; color:color-mix(in srgb, var(--blueprint-ink) 65%, transparent);}
+.hero-meta .m b{display:block; font-size:16px; color:var(--blueprint-ink); font-weight:600;}
+
+/* ---------- GENERIC PANELS ---------- */
+.panel{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow);}
+.grid2{display:grid; grid-template-columns:1fr 1fr; gap:18px;}
+@media (max-width:720px){.grid2{grid-template-columns:1fr;}}
+
+.compare-grid{display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:8px;}
+@media (max-width:720px){.compare-grid{grid-template-columns:1fr;}}
+.compare-card{padding:22px 24px; border-radius:var(--radius);}
+.compare-card.bad{background:var(--surface-2); border:1px solid var(--line);}
+.compare-card.good{background:var(--blueprint); color:var(--blueprint-ink); border:1px solid var(--blueprint);}
+.compare-card h3{font-size:16px; margin-bottom:14px;}
+.compare-card.good h3{color:var(--cyan);}
+.compare-card ul{margin:0; padding-left:0; list-style:none; display:flex; flex-direction:column; gap:10px;}
+.compare-card li{position:relative; padding-left:20px; font-size:14.5px;}
+.compare-card.bad li::before{content:"✕"; position:absolute; left:0; color:var(--ink-faint); font-weight:700;}
+.compare-card.good li::before{content:"✓"; position:absolute; left:0; color:var(--cyan); font-weight:700;}
+.pull{text-align:center; padding-block:28px; margin-block:8px;}
+.pull p{font-family:'Archivo',sans-serif; font-weight:700; font-size:clamp(22px,3.6vw,32px); line-height:1.3;}
+.pull p.dim{color:var(--ink-faint); font-weight:600;}
+.pull .cap{margin-top:14px; color:var(--ink-soft); font-size:14.5px; max-width:600px; margin-inline:auto;}
+
+/* ---------- LAYERS TABLE ---------- */
+.reftable{width:100%; border-collapse:collapse; font-size:14.5px;}
+.reftable th{
+  text-align:left; font-family:'IBM Plex Mono',monospace; font-size:11.5px; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--ink-faint); padding:10px 14px; border-bottom:1px solid var(--line);
+}
+.reftable td{padding:14px; border-bottom:1px solid var(--line); vertical-align:top;}
+.reftable tr:last-child td{border-bottom:none;}
+.reftable td.doc{font-weight:700; white-space:nowrap;}
+.pill{display:inline-block; padding:3px 10px; border-radius:999px; font-size:11.5px; font-weight:600; font-family:'IBM Plex Mono',monospace;}
+.pill.medium{background:var(--surface-3); color:var(--ink-soft);}
+.pill.high{background:var(--cyan-soft); color:var(--cyan);}
+.pill.veryhigh{background:var(--copper-wash); color:var(--copper-strong);}
+.tablewrap{overflow-x:auto;}
+
+/* ---------- FLIP CARDS ---------- */
+.flip-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:18px; margin-top:26px;}
+@media (max-width:720px){.flip-grid{grid-template-columns:1fr;}}
+.flip-card{perspective:1400px; height:360px;}
+.flip-btn{all:unset; display:block; width:100%; height:100%; cursor:pointer;}
+.flip-inner{position:relative; width:100%; height:100%; transition:transform .55s cubic-bezier(.2,.7,.3,1); transform-style:preserve-3d;}
+.flip-card.flipped .flip-inner{transform:rotateY(180deg);}
+.flip-face{position:absolute; inset:0; backface-visibility:hidden; border-radius:var(--radius); padding:22px; border:1px solid var(--line); overflow:auto;}
+.flip-front{background:var(--surface); box-shadow:var(--shadow); display:flex; flex-direction:column; gap:10px;}
+.flip-back{background:var(--blueprint); color:var(--blueprint-ink); transform:rotateY(180deg); box-shadow:var(--shadow);}
+.flip-tag{font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--copper);}
+.flip-front h3{font-size:19px; margin-top:2px;}
+.flip-front ul{margin:6px 0 0; padding-left:18px; font-size:13.5px; color:var(--ink-soft); display:flex; flex-direction:column; gap:5px;}
+.flip-cap{margin-top:auto; font-size:12.5px; font-weight:700; color:var(--copper);}
+.flip-hint{margin-top:8px; font-size:11.5px; color:var(--ink-faint); font-family:'IBM Plex Mono',monospace;}
+.flip-back .flip-tag{color:var(--cyan);}
+.codebox{
+  font-family:'IBM Plex Mono',monospace; font-size:12px; line-height:1.55; background:rgba(255,255,255,.08);
+  border-radius:8px; padding:12px 14px; white-space:pre-wrap; margin-top:8px;
+}
+.flip-back p{font-size:13px; margin-top:8px; color:color-mix(in srgb, var(--blueprint-ink) 85%, transparent);}
+.flip-back b{color:var(--blueprint-ink);}
+
+/* ---------- LOOP DIAGRAM ---------- */
+.loop{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:6px;}
+.loop-step{
+  flex:1; min-width:160px; background:var(--surface); border:1px solid var(--line); border-radius:12px;
+  padding:14px 16px; box-shadow:var(--shadow); text-align:center;
+}
+.loop-step .k{font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--copper); font-weight:700; letter-spacing:.06em;}
+.loop-step .t{font-weight:700; font-size:14.5px; margin-top:4px;}
+.loop-arrow{color:var(--ink-faint); font-size:20px; flex:none;}
+.loop-note{margin-top:10px; font-size:13px; color:var(--ink-faint); font-family:'IBM Plex Mono',monospace; text-align:center;}
+
+/* ---------- STEPPER ---------- */
+.stepper-nav{display:flex; flex-wrap:wrap; gap:8px; margin-top:22px;}
+.step-btn{
+  all:unset; cursor:pointer; padding:9px 14px; border-radius:10px; border:1px solid var(--line);
+  background:var(--surface); font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:var(--ink-soft);
+  display:flex; align-items:center; gap:8px; transition:background .15s, color .15s, border-color .15s;
+}
+.step-btn b{color:var(--ink-faint); font-weight:700;}
+.step-btn.active{background:var(--blueprint); color:var(--blueprint-ink); border-color:var(--blueprint);}
+.step-btn.active b{color:var(--cyan);}
+.step-btn.highlight:not(.active){border-color:var(--copper-soft); color:var(--copper-strong);}
+.step-btn.done{border-color:var(--good);}
+.step-btn .chk{color:var(--good); font-weight:700;}
+.step-panel{margin-top:20px; padding:26px; display:none;}
+.step-panel.active{display:block;}
+.step-panel h3{font-size:20px; margin-bottom:4px;}
+.step-panel .q{color:var(--copper); font-weight:600; font-size:14px; margin-top:4px;}
+.step-panel p.desc{margin-top:12px; color:var(--ink-soft); font-size:15px;}
+.step-note{margin-top:14px; padding:12px 14px; background:var(--copper-wash); border-radius:8px; font-size:13.5px; color:var(--copper-strong);}
+
+/* ---------- LAB BLOCK ---------- */
+.lab-block{margin-top:20px; border:1px solid var(--line); border-radius:12px; background:var(--surface-2); padding:18px 20px;}
+.lab-row{display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;}
+.lab-tag{font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; padding:4px 10px; border-radius:999px;}
+.lab-tag.code{background:var(--copper-wash); color:var(--copper-strong);}
+.lab-tag.talk{background:var(--cyan-soft); color:var(--cyan);}
+.lab-time{font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--ink-faint);}
+.lab-block h5{margin-top:14px; font-size:11.5px; color:var(--ink-faint); text-transform:uppercase; letter-spacing:.06em; font-family:'IBM Plex Mono',monospace; font-weight:600;}
+.lab-what, .lab-why{font-size:14px; margin-top:5px; color:var(--ink);}
+.lab-why{color:var(--ink-soft);}
+.lab-steps{margin:6px 0 0; padding-left:19px; font-size:13.5px; display:flex; flex-direction:column; gap:7px; color:var(--ink);}
+.prompt-box{position:relative; margin-top:6px;}
+.prompt-box pre{
+  font-family:'IBM Plex Mono',monospace; font-size:12.5px; background:var(--surface-3); color:var(--ink);
+  border-radius:8px; padding:12px 40px 12px 14px; white-space:pre-wrap; border:1px dashed var(--line); margin:0;
+}
+.copy-btn{
+  all:unset; position:absolute; top:8px; right:8px; font-family:'IBM Plex Mono',monospace; font-size:10px;
+  padding:4px 8px; border-radius:6px; background:var(--surface); border:1px solid var(--line); cursor:pointer; color:var(--ink-soft);
+}
+.copy-btn:hover{color:var(--copper);}
+.lab-output{font-family:'IBM Plex Mono',monospace; font-size:12.5px; margin-top:8px; color:var(--copper);}
+.lab-check{font-size:13px; margin-top:8px; font-style:italic; color:var(--ink-soft);}
+.lab-complete{display:flex; align-items:center; gap:9px; margin-top:14px; font-size:13.5px; font-weight:600;}
+.lab-complete input{width:18px; height:18px; accent-color:var(--good);}
+
+/* ---------- BARS ---------- */
+.bars{display:flex; align-items:flex-end; gap:14px; height:220px; margin-top:30px; padding:0 4px;}
+.bar-col{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; gap:8px;}
+.bar{width:100%; border-radius:8px 8px 0 0; background:var(--copper); transition:height .5s;}
+.bar-col:nth-child(1) .bar{background:var(--ink-faint);}
+.bar-col:nth-child(2) .bar{background:var(--cyan);}
+.bar-label{font-size:12.5px; font-weight:700; text-align:center;}
+.bar-sub{font-size:11px; color:var(--ink-faint); text-align:center;}
+
+/* ---------- FILE TREE ---------- */
+.ide{display:grid; grid-template-columns:280px 1fr; gap:0; border:1px solid var(--line); border-radius:var(--radius); overflow:hidden; margin-top:24px; box-shadow:var(--shadow);}
+@media (max-width:720px){.ide{grid-template-columns:1fr;}}
+.ide-bar{grid-column:1/-1; background:var(--surface-3); padding:8px 14px; display:flex; gap:7px; align-items:center;}
+.ide-bar span{width:10px;height:10px;border-radius:50%; background:var(--line);}
+.ide-bar b{margin-left:8px; font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--ink-faint); font-weight:500;}
+.tree{background:var(--surface-2); padding:14px 10px; font-family:'IBM Plex Mono',monospace; font-size:13px; max-height:420px; overflow:auto;}
+.tree ul{list-style:none; margin:0; padding-left:16px;}
+.tree > ul{padding-left:0;}
+.folder-btn{all:unset; cursor:pointer; display:flex; align-items:center; gap:6px; padding:4px 6px; border-radius:6px; width:100%; color:var(--ink-soft); font-weight:600;}
+.folder-btn:hover{background:var(--surface-3);}
+.folder-btn .chev{transition:transform .15s; font-size:10px; color:var(--ink-faint);}
+.folder-btn.open .chev{transform:rotate(90deg);}
+.file-btn{all:unset; cursor:pointer; display:flex; align-items:center; gap:6px; padding:4px 6px 4px 22px; border-radius:6px; width:100%; color:var(--ink-soft); font-size:12.5px;}
+.file-btn:hover, .file-btn.active{background:var(--copper-wash); color:var(--copper-strong);}
+.file-dot{color:var(--ink-faint);}
+.preview{padding:22px; background:var(--surface); display:flex; flex-direction:column; gap:10px;}
+.preview .ph{font-family:'IBM Plex Mono',monospace; font-size:13px; color:var(--copper); font-weight:600;}
+.preview .pd{color:var(--ink-soft); font-size:14.5px; line-height:1.6;}
+.preview .empty{color:var(--ink-faint); font-size:13.5px; font-style:italic;}
+
+/* ---------- STACK / SETUP ---------- */
+.stack-steps{margin:16px 0 0; padding:0; list-style:none; display:flex; flex-direction:column; gap:0;}
+.stack-steps li{display:flex; gap:16px; padding:14px 0; border-bottom:1px solid var(--line);}
+.stack-steps li:last-child{border-bottom:none;}
+.stack-steps .snum{font-family:'IBM Plex Mono',monospace; font-weight:700; color:var(--copper); flex:none; width:22px;}
+.stack-steps .stxt b{display:block; font-size:14.5px; margin-bottom:3px;}
+.stack-steps .stxt span{font-size:13.5px; color:var(--ink-soft);}
+.stack-steps .stxt code{font-family:'IBM Plex Mono',monospace; background:var(--surface-3); padding:1px 6px; border-radius:4px; font-size:12.5px;}
+.model-table{width:100%; border-collapse:collapse; margin-top:16px; font-size:13.5px;}
+.model-table th{text-align:left; font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-faint); padding:8px 10px; border-bottom:1px solid var(--line);}
+.model-table td{padding:10px; border-bottom:1px solid var(--line);}
+.model-table code{font-family:'IBM Plex Mono',monospace; background:var(--surface-3); padding:1px 6px; border-radius:4px;}
+
+.tool-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:16px; margin-top:22px;}
+@media (max-width:820px){.tool-grid{grid-template-columns:1fr;}}
+.tool-card{padding:20px; border-radius:var(--radius); border:1px solid var(--line); background:var(--surface); box-shadow:var(--shadow); display:flex; flex-direction:column; gap:10px;}
+.tool-card.rec{border-color:var(--copper); box-shadow:0 0 0 1px var(--copper), var(--shadow);}
+.tool-head{display:flex; align-items:center; justify-content:space-between; gap:10px;}
+.tool-head h3{font-size:17px;}
+.badge{font-size:11px; font-family:'IBM Plex Mono',monospace; font-weight:600; padding:3px 9px; border-radius:999px;}
+.badge.oss{background:var(--cyan-soft); color:var(--cyan);}
+.badge.closed{background:var(--surface-3); color:var(--ink-soft);}
+.badge.rec{background:var(--copper); color:#fff;}
+.tool-card .desc{font-size:14px; color:var(--ink-soft);}
+.tool-card .fit{font-size:13px; margin-top:2px; padding-top:10px; border-top:1px dashed var(--line); color:var(--ink);}
+.tool-card .fit b{color:var(--copper);}
+.rpm-box{margin-top:28px; background:var(--blueprint); color:var(--blueprint-ink); border-radius:var(--radius); padding:26px 28px;}
+.rpm-box .eyebrow{color:var(--cyan);}
+.rpm-box .eyebrow::before{background:var(--cyan);}
+.rpm-box h3{color:var(--blueprint-ink); font-size:20px; margin-top:8px;}
+.rpm-box ol{margin:14px 0 0; padding-left:20px; display:flex; flex-direction:column; gap:10px;}
+.rpm-box li{font-size:14.5px; color:color-mix(in srgb, var(--blueprint-ink) 90%, transparent);}
+.rpm-box li b{color:var(--copper-soft);}
+.rpm-final{margin-top:18px; padding:14px 16px; background:rgba(255,255,255,.06); border-radius:10px; font-size:14px; border-left:3px solid var(--copper-soft);}
+
+.take-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-top:8px;}
+@media (max-width:820px){.take-grid{grid-template-columns:1fr;}}
+.take-card{background:var(--blueprint); color:var(--blueprint-ink); border-radius:var(--radius); padding:22px;}
+.take-card .n{font-family:'IBM Plex Mono',monospace; color:var(--copper-soft); font-size:22px; font-weight:700;}
+.take-card h4{margin-top:8px; font-size:16px; color:var(--blueprint-ink);}
+.take-card p{margin-top:8px; font-size:13.5px; color:color-mix(in srgb, var(--blueprint-ink) 82%, transparent);}
+
+footer{padding-block:40px; text-align:center; color:var(--ink-faint); font-size:13px;}
+.skip-link{position:absolute; left:-999px;}
+.skip-link:focus{left:20px; top:20px; background:var(--surface); padding:8px 14px; border-radius:8px; z-index:100;}
+
+.flow-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-top:8px;}
+@media (max-width:860px){.flow-grid{grid-template-columns:1fr;}}
+.flow-card{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:20px 22px; box-shadow:var(--shadow); display:flex; flex-direction:column; gap:10px;}
+.flow-card .who{font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--copper); font-weight:600;}
+.flow-card h3{font-size:18px;}
+.flow-card ol{margin:0; padding-left:20px; font-size:14.5px; color:var(--ink-soft); display:flex; flex-direction:column; gap:5px;}
+.flow-card .out{margin-top:auto; font-size:13.5px; border-top:1px dashed var(--line); padding-top:10px; color:var(--ink);}
+.era-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin:6px 0 22px;}
+@media (max-width:860px){.era-grid{grid-template-columns:1fr;}}
+.era{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:18px 20px;}
+.era .yr{font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--copper); font-weight:600; letter-spacing:.08em;}
+.era h3{font-size:16px; margin:6px 0 8px;}
+.era p{font-size:14px; color:var(--ink-soft);}
+.era.now{background:var(--blueprint); border-color:var(--blueprint); color:var(--blueprint-ink);}
+.era.now h3{color:var(--cyan);} .era.now p{color:color-mix(in srgb, var(--blueprint-ink) 88%, transparent);}
+.msg-list{margin:18px 0 0; padding-left:20px; display:flex; flex-direction:column; gap:10px; font-size:14.5px; color:var(--ink-soft);}
+.msg-list b{color:var(--ink);}
+.model-table{width:100%; table-layout:fixed;} .model-table td{overflow-wrap:anywhere;} .model-table code{word-break:break-all;}
+</style>
+
+<a class="skip-link" href="#main">Skip to content</a>
+
+<nav class="topnav">
+  <div class="topnav-inner" id="navinner">
+    <div class="brand"><span class="dot"></span>HINDALCO · DAY 3 &amp; 4</div>
+    <div class="navlinks" id="navlinks">
+      <a href="#why">Why Specs Matter</a>
+      <a href="#failure">Why Specs Fail</a>
+      <a href="#layers">Five Layers</a>
+      <a href="#stages">Nine Stages</a>
+      <a href="#flow">Our 2 Days</a>
+      <a href="#example">Your Repo</a>
+      <a href="#stack">Your Stack</a>
+    </div>
+    <div class="navprogress"><span class="ring" id="progRing"></span><span id="progText">0/9 stages</span></div>
+  </div>
+</nav>
+
+<main id="main">
+<section class="hero">
+  <div class="wrap hero-inner">
+    <div class="title-block">
+      <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+      <div class="eyebrow">AI ENGINEER PROGRAM · DAY 3 &amp; 4</div>
+      <h1>From <em>spec</em> to <em>vibe&nbsp;code</em>,<br>one layer at a time.</h1>
+      <p class="lede">A field guide for Hindalco's classroom track. First, why specifications matter far more now that an AI agent writes the code. Then the layers of spec-driven development, shown on one small plant-floor example — a potline energy alert. Then you put it to work: one spec-driven Cline prompt builds your image classifier in Lab 1, Lab 2 takes it to production, and your team repeats the whole path on your own Day-1 problem in the capstone.</p>
+      <blockquote>&ldquo;AI coding agents do not perform better when you write more. They perform better when each document answers exactly one question.&rdquo;</blockquote>
+      <div class="hero-meta">
+        <div class="m"><b>2</b>days, 3 labs</div>
+        <div class="m"><b>9</b>stages, 1 example</div>
+        <div class="m"><b>Cline</b>+ GPT-5.6 Luna on Azure AI Foundry</div>
+        <div class="m"><b>Day 3–4</b>this session</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="wrap">
+
+<section id="why">
+  <div class="section-head">
+    <div class="eyebrow">Why Specs Matter — Then and Now</div>
+    <h2>The developer changed. So the specification had to change.</h2>
+    <p class="sub">Specifications are not new. What is new is <em>who reads them</em>. For thirty years the reader was a human developer who could ask questions. Today the first reader is an AI agent that writes hundreds of lines a minute — and fills every gap with a silent guess.</p>
+  </div>
+
+  <div class="era-grid">
+    <div class="era">
+      <div class="yr">1990s – 2000s · WATERFALL</div>
+      <h3>The big document era</h3>
+      <p>Business analysts wrote a BRD, then an FRD, then an SRS — often 100–200 pages — and handed them to developers who built for months. Gaps were filled in meetings and at the analyst's desk. Documents went stale the day coding started.</p>
+    </div>
+    <div class="era">
+      <div class="yr">2001 – 2020 · AGILE</div>
+      <h3>The conversation era</h3>
+      <p>"Working software over comprehensive documentation." Specs shrank to user stories and acceptance criteria. The real detail lived in conversations and in the team's memory — which worked, because the developer was a person in the room who could ask "what did you mean?".</p>
+    </div>
+    <div class="era now">
+      <div class="yr">2023 → NOW · AI AGENTS</div>
+      <h3>The spec-driven era</h3>
+      <p>An agent like Cline writes the code in minutes. It was not in your meeting, it forgets between sessions, and it rarely asks — it assumes. The spec is now the main input to the build: short, layered, precise, version-controlled next to the code, and reused to regenerate code and tests.</p>
+    </div>
+  </div>
+
+  <div class="panel tablewrap">
+    <table class="reftable">
+      <thead><tr><th></th><th>Before AI</th><th>With an AI coding agent</th></tr></thead>
+      <tbody>
+        <tr><td class="doc">Who writes the code</td><td>A developer, over weeks</td><td>An agent, in minutes — a human reviews</td></tr>
+        <tr><td class="doc">When the spec has a gap</td><td>The developer asks, or uses judgement</td><td>The agent guesses silently — at machine speed</td></tr>
+        <tr><td class="doc">Where knowledge lives</td><td>In people's heads and meetings</td><td>In the spec files the agent can read</td></tr>
+        <tr><td class="doc">Cost of a vague spec</td><td>Some rework later</td><td>Confident, working-looking code that does the wrong thing</td></tr>
+        <tr><td class="doc">Life of the spec</td><td>Written once, rarely updated</td><td>Lives in Git; change the spec, regenerate the code</td></tr>
+        <tr><td class="doc">Tests come from</td><td>The code that was written</td><td>The spec — so they catch what the agent skipped</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <ul class="msg-list">
+    <li><b>Plant analogy.</b> A spec is a Standard Operating Procedure. A new operator follows the SOP exactly; a vague SOP gives inconsistent product. Cline is an extremely fast new operator who never asks a question — so the SOP must be exact.</li>
+    <li><b>Why it matters even more for ML.</b> An ML spec must fix things an app spec never needed: which data and labels, how it is split, which metric, what score is "good enough" (the quality gate), and the exact input and output of the prediction service. In today's Lab 1 prompt you will see lines like <span class="mono">80% train / 20% test, seed 42</span>, <span class="mono">exit if accuracy &lt; 0.70</span> and <span class="mono">{"image": "&lt;base64&gt;"}</span> — each one a decision the agent must not invent.</li>
+    <li><b>Your role changes.</b> You no longer have to type every line. You <b>specify</b> clearly, <b>review</b> what the agent produces, and <b>validate</b> it against the acceptance criteria. That is the skill this program is building.</li>
+  </ul>
+</section>
+
+<section id="failure">
+  <div class="section-head">
+    <div class="eyebrow">The Failure Mode</div>
+    <h2>One enormous document that answers everything, badly</h2>
+    <p class="sub">The instinct is to write a single, exhaustive specification. It fails for a specific, mechanical reason — not because people are lazy, but because retrieval and review both break at that size.</p>
+  </div>
+  <div class="compare-grid">
+    <div class="compare-card bad">
+      <h3>The 200-page specification</h3>
+      <ul>
+        <li>Business context buried beside endpoint definitions</li>
+        <li>Nobody reads it end to end — including the agent</li>
+        <li>A change to one API forces a rewrite of the whole file</li>
+        <li>Retrieval pulls in 190 irrelevant pages</li>
+        <li>Review becomes impossible, so review stops happening</li>
+      </ul>
+    </div>
+    <div class="compare-card good">
+      <h3>What actually helps</h3>
+      <ul>
+        <li>Small documents, each with one job</li>
+        <li>Ambiguity removed progressively, stage by stage</li>
+        <li>Version-controlled alongside the code</li>
+        <li>Retrievable in isolation — the agent reads only what it needs</li>
+        <li>Reviewable in one sitting by one person</li>
+      </ul>
+    </div>
+  </div>
+  <div class="pull" style="padding-bottom:0;">
+    <p class="cap" style="font-size:15px;">The question is never PRD or FRD or SRS. It is which question <em>this particular file</em> is answering.</p>
+  </div>
+</section>
+
+<section>
+  <div class="pull">
+    <p class="dim">Do not write everything down.</p>
+    <p>Reduce ambiguity progressively.</p>
+    <p class="cap">Each layer takes the output of the one above it and makes one more category of decision explicit. By the time you reach implementation tasks, there is nothing left for the agent to guess — and nothing was written twice.</p>
+  </div>
+</section>
+
+<section id="layers">
+  <div class="section-head">
+    <div class="eyebrow">The Five Layers · Running Example</div>
+    <h2>Potline Energy Alert — five documents, five questions</h2>
+    <p class="sub">One small tool, used the whole session: notify a shift engineer when a potline's specific energy consumption (kWh/tonne) drifts outside its target band. Click any card to flip it and see the real artifact behind each layer.</p>
+  </div>
+
+  <div class="panel tablewrap">
+    <table class="reftable">
+      <thead><tr><th>Document</th><th>Answers</th><th>Audience</th><th>AI Value</th></tr></thead>
+      <tbody>
+        <tr><td class="doc">PRD</td><td>What problem are we solving?</td><td>Shift &amp; plant managers</td><td><span class="pill medium">Medium</span></td></tr>
+        <tr><td class="doc">Feature Spec (FRD)</td><td>What should the system do?</td><td>Analysts, developers</td><td><span class="pill high">High</span></td></tr>
+        <tr><td class="doc">Technical Spec (SRS)</td><td>Exactly how should it behave?</td><td>Developers, QA, Cline</td><td><span class="pill veryhigh">Very High</span></td></tr>
+        <tr><td class="doc">Architecture</td><td>How will we build it?</td><td>Engineers</td><td><span class="pill veryhigh">Very High</span></td></tr>
+        <tr><td class="doc">Implementation Tasks</td><td>What code needs writing?</td><td>Developers, Cline</td><td><span class="pill veryhigh">Very High</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="flip-grid">
+    <div class="flip-card" data-flip>
+      <button class="flip-btn" aria-pressed="false">
+        <div class="flip-inner">
+          <div class="flip-face flip-front">
+            <span class="flip-tag">Layer 1 · PRD</span>
+            <h3>Why build this at all?</h3>
+            <ul><li>Shift engineers miss energy excursions</li><li>Found out hours later, in the shift report</li><li>Budget: reuse existing sensor feed</li></ul>
+            <span class="flip-cap">No implementation detail.</span>
+            <span class="flip-hint">↻ tap to see the real artifact</span>
+          </div>
+          <div class="flip-face flip-back">
+            <span class="flip-tag">Real example</span>
+            <div class="codebox">PRD
+Build a Potline Energy Alert tool.
+
+Users should:
+ - See live specific energy consumption
+ - Get notified on a threshold breach
+ - Acknowledge an active alert
+ - View alert history for a shift</div>
+            <p><b>Establishes:</b> the business problem, users, goals, success metric (minutes-to-acknowledge).</p>
+            <p><b>Omits:</b> thresholds, screens, endpoints, data model — Cline given only this will invent all four.</p>
+          </div>
+        </div>
+      </button>
+    </div>
+
+    <div class="flip-card" data-flip>
+      <button class="flip-btn" aria-pressed="false">
+        <div class="flip-inner">
+          <div class="flip-face flip-front">
+            <span class="flip-tag">Layer 2 · Feature Spec</span>
+            <h3>What should it do, exactly?</h3>
+            <ul><li>Reading comes in every N seconds</li><li>Compare against target band</li><li>Raise + let engineer acknowledge</li></ul>
+            <span class="flip-cap">Still no engineering.</span>
+            <span class="flip-hint">↻ tap to see the real artifact</span>
+          </div>
+          <div class="flip-face flip-back">
+            <span class="flip-tag">Real example</span>
+            <div class="codebox">FEATURE: ENERGY THRESHOLD ALERT
+Actor: Shift Engineer
+Preconditions: Potline reading feed active.
+
+Flow:
+ 1. Reading ingested for potline
+ 2. Compared to target band
+ 3. On breach, alert raised
+ 4. Engineer acknowledges alert
+
+Exceptions:
+ Sensor reading missing
+ Duplicate breach within cooldown window</div>
+            <p><b>One feature per file.</b> Alert acknowledgement never shares a document with sensor onboarding.</p>
+          </div>
+        </div>
+      </button>
+    </div>
+
+    <div class="flip-card" data-flip>
+      <button class="flip-btn" aria-pressed="false">
+        <div class="flip-inner">
+          <div class="flip-face flip-front">
+            <span class="flip-tag">Layer 3 · Technical Spec</span>
+            <h3>Exact behaviour</h3>
+            <ul><li>Endpoint shapes</li><li>Real thresholds, real cooldowns</li><li>Every error, with its status code</li></ul>
+            <span class="flip-cap">What Cline needs.</span>
+            <span class="flip-hint">↻ tap to see the real artifact</span>
+          </div>
+          <div class="flip-face flip-back">
+            <span class="flip-tag">Real example — this is the layer that pays</span>
+            <div class="codebox">POST /alerts/{id}/acknowledge
+Input: { engineer_id }
+Validation: alert must be OPEN
+
+Response 200:
+ { alert_id, acknowledged_by, acknowledged_at }
+Errors:
+ 404 Alert not found
+ 409 Already acknowledged
+ 422 Missing engineer_id</div>
+            <p>Exact shapes, real values ("cooldown = 10 minutes", not "avoid spamming"). Nothing left to infer.</p>
+          </div>
+        </div>
+      </button>
+    </div>
+
+    <div class="flip-card" data-flip>
+      <button class="flip-btn" aria-pressed="false">
+        <div class="flip-inner">
+          <div class="flip-face flip-front">
+            <span class="flip-tag">Layer 4 · Architecture</span>
+            <h3>Where does each piece live?</h3>
+            <ul><li>Sensor feed → ingestion</li><li>Rules engine → alert service</li><li>Alert log → notification</li></ul>
+            <span class="flip-cap">Where things go.</span>
+            <span class="flip-hint">↻ tap to see the real artifact</span>
+          </div>
+          <div class="flip-face flip-back">
+            <span class="flip-tag">Real example</span>
+            <div class="codebox">Sensor Feed
+  → Ingestion Service
+    → Rules Engine
+      → Alert Service
+        → Postgres (alert log)
+        → Notification (SMS / chat)
+Dashboard (read-only) → Alert Service API</div>
+            <p>Without this layer, Cline will happily put the threshold check inside the dashboard — it works, right up until a second plant's dashboard needs the same rule.</p>
+          </div>
+        </div>
+      </button>
+    </div>
+  </div>
+  <p class="sub" style="margin-top:18px;">Nobody hands a shift engineer the budget conversation. Nobody hands a plant manager the cooldown-window value.</p>
+</section>
+
+<section id="stages">
+  <div class="section-head">
+    <div class="eyebrow">Why This Order · Concept Walkthrough</div>
+    <h2>Nine stages. Understand each one here — then see where it lives in your lab.</h2>
+    <p class="sub">Each stage removes one more kind of ambiguity. Click through them: the potline example shows the idea, and the second box shows exactly where the same stage appears in your Lab 1 prompt, your repository and your capstone. The question is always <em>what decision did this stage force us to make, and why does the next stage need it?</em></p>
+  </div>
+
+  <div class="loop">
+    <div class="loop-step"><div class="k">HERE</div><div class="t">Understand the stage</div></div>
+    <div class="loop-arrow">→</div>
+    <div class="loop-step"><div class="k">VS CODE + CLINE</div><div class="t">Your Lab 1 prompt covers it</div></div>
+    <div class="loop-arrow">→</div>
+    <div class="loop-step"><div class="k">YOUR REPO</div><div class="t">Check the file it produced</div></div>
+  </div>
+  <div class="loop-note">↻ the same nine stages, condensed into one spec-driven prompt for a one-day lab</div>
+
+  <div class="stepper-nav" id="stepperNav"></div>
+  <div class="panel" id="stepperPanels"></div>
+
+  <div class="bars">
+    <div class="bar-col"><div class="bar" style="height:22%"></div><div class="bar-label">PRD</div><div class="bar-sub">Medium</div></div>
+    <div class="bar-col"><div class="bar" style="height:45%"></div><div class="bar-label">FRD</div><div class="bar-sub">High</div></div>
+    <div class="bar-col"><div class="bar" style="height:88%"></div><div class="bar-label">SRS</div><div class="bar-sub">Very High</div></div>
+    <div class="bar-col"><div class="bar" style="height:88%"></div><div class="bar-label">Arch.</div><div class="bar-sub">Very High</div></div>
+    <div class="bar-col"><div class="bar" style="height:88%"></div><div class="bar-label">Tasks</div><div class="bar-sub">Very High</div></div>
+  </div>
+  <p class="sub" style="margin-top:10px;">Skip a layer and Cline fills the gap silently. It will not tell you which assumption it made — that is why your Lab 1 prompt spells out file names, arguments, metrics and the request/response format, and why you read the spec before letting Cline continue.</p>
+</section>
+
+<section id="flow">
+  <div class="section-head">
+    <div class="eyebrow">Our Two Days</div>
+    <h2>One path, walked twice — first guided, then as a team</h2>
+    <p class="sub">You practise the full journey on a simple image classifier, then repeat it on your own plant problem. Each step builds on the one before; nothing is thrown away.</p>
+  </div>
+  <div class="flow-grid">
+    <div class="flow-card">
+      <div class="who">Lab 1 · Individual · your laptop</div>
+      <h3>Spec → vibe code → deep learning</h3>
+      <ol>
+        <li>Install Cline, connect it to the class model</li>
+        <li>Paste the spec-driven prompt: Cline writes the spec, code and tests</li>
+        <li>Train and test on your laptop</li>
+        <li>Learn DL by watching it: loss, train vs test, confusion matrix, confidence</li>
+        <li>Experiments: 1 epoch, from scratch, an unknown class</li>
+      </ol>
+      <div class="out"><b>Output:</b> a working, tested classifier and a validation report</div>
+    </div>
+    <div class="flow-card">
+      <div class="who">Lab 2 · Individual · laptop + Azure</div>
+      <h3>From laptop to production</h3>
+      <ol>
+        <li>Create your GitHub repository and push</li>
+        <li>Upload images as a versioned Data asset</li>
+        <li>Train + test as an Azure ML job; register the model</li>
+        <li>Deploy a live endpoint; call it from a small app</li>
+        <li>Build a 3-step pipeline: prep → train → evaluate</li>
+        <li>Azure DevOps: add a new class, watch it retrain and redeploy</li>
+        <li>Monitor: requests, latency, errors, prediction logs</li>
+      </ol>
+      <div class="out"><b>Output:</b> a live, versioned, self-updating model</div>
+    </div>
+    <div class="flow-card">
+      <div class="who">Capstone · Team · one laptop</div>
+      <h3>Your Day-1 problem, end to end</h3>
+      <ol>
+        <li>Exhibit A — your Day-1 Charter in the repo</li>
+        <li>Exhibit B — Cline builds your model; baseline vs deep learning</li>
+        <li>Exhibit C — a working app a plant user can operate</li>
+        <li>Exhibit D — endpoint, app re-pointed, pipeline, monitoring runbook</li>
+        <li>Closing the Case — the final team presentation</li>
+      </ol>
+      <div class="out"><b>Output:</b> one repository with all four Exhibits + the final demo</div>
+    </div>
+  </div>
+
+  <div class="panel tablewrap" style="margin-top:22px;">
+    <table class="reftable">
+      <thead><tr><th>Stage</th><th>Where it lives in your Lab 1 prompt and repo</th></tr></thead>
+      <tbody>
+        <tr><td class="doc">Vision · PRD</td><td>"Goal: predict which animal is in a photo, with a confidence score" → top of <span class="mono">specs/animal_classifier_spec.md</span></td></tr>
+        <tr><td class="doc">Feature spec</td><td>Rules: folder name = label, never hard-code the classes, 80/20 split, quality gate</td></tr>
+        <tr><td class="doc">Architecture</td><td>Shared <span class="mono">model_utils.py</span> used by train, evaluate and score; Azure files are given and must not change</td></tr>
+        <tr><td class="doc">Technical design</td><td>Exact arguments (<span class="mono">--train_data --model_dir</span>), model files (<span class="mono">model.pt + classes.json</span>), request/response JSON</td></tr>
+        <tr><td class="doc">Tasks</td><td>PHASE 2 — one file per job: prep, train, evaluate, predict, score, tests, app</td></tr>
+        <tr><td class="doc">AI coding</td><td>Cline writes the files; you watch every change</td></tr>
+        <tr><td class="doc">Tests</td><td>PHASE 3 + AC1–AC9 → <span class="mono">specs/validation_report.md</span></td></tr>
+        <tr><td class="doc">Review</td><td>You read the spec before Cline continues, and check the report and the outputs yourself</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="example">
+  <div class="section-head">
+    <div class="eyebrow">Worked Example</div>
+    <h2>How this looks inside your repository</h2>
+    <p class="sub">This is the folder you build in Lab 1 and take to production in Lab 2. Click through the tree — it behaves like the VS Code explorer on your laptop. Your capstone repository has the same shape, plus an <span class="mono">exhibits/</span> folder.</p>
+  </div>
+  <div class="ide">
+    <div class="ide-bar"><span style="background:#e6595a"></span><span style="background:#e0a940"></span><span style="background:#57c26e"></span><b>hindalco-animal-lab/</b></div>
+    <div class="tree" id="tree"></div>
+    <div class="preview" id="preview">
+      <span class="empty">Click a file on the left to see what question it answers.</span>
+    </div>
+  </div>
+  <p class="sub" style="margin-top:16px;">The spec and the validation report live next to the code in Git. Change the spec, and Cline can regenerate the code — the spec is source, not paperwork.</p>
+</section>
+
+<section id="stack">
+  <div class="section-head">
+    <div class="eyebrow">Your Stack</div>
+    <h2>Cline on your laptop, GPT-5.6 Luna on Azure AI Foundry</h2>
+    <p class="sub">Every Cline task in this program — Lab 1 and the capstone — uses the same setup: the Cline extension in VS Code on your laptop, talking directly to the class's GPT-5.6 Luna deployment on Azure AI Foundry.</p>
+  </div>
+
+  <div class="loop" style="margin-top:6px;">
+    <div class="loop-step"><div class="k">YOUR LAPTOP</div><div class="t">VS Code + Cline</div></div>
+    <div class="loop-arrow">→</div>
+    <div class="loop-step"><div class="k">AZURE AI FOUNDRY</div><div class="t">OpenAI-compatible endpoint</div></div>
+    <div class="loop-arrow">→</div>
+    <div class="loop-step"><div class="k">MODEL</div><div class="t">GPT-5.6 Luna deployment</div></div>
+  </div>
+
+  <div class="panel" style="padding:24px 26px; margin-top:22px;">
+    <h3 style="font-size:17px;">What you enter into Cline (once)</h3>
+    <table class="model-table">
+      <thead><tr><th>Cline field</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>API Provider</td><td>OpenAI Compatible</td></tr>
+        <tr><td>Base URL</td><td><code>https://director-9575-resource.services.ai.azure.com/openai/v1</code></td></tr>
+        <tr><td>API Key</td><td>given by your trainer in class — never paste it into code, files or chats</td></tr>
+        <tr><td>Model ID</td><td>the exact deployment name given by your trainer (case-sensitive)</td></tr>
+        <tr><td>Reasoning effort</td><td>None — only if you see an error about "function tools" and "reasoning_effort"</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="panel" style="padding:24px 26px; margin-top:18px;">
+    <h3 style="font-size:17px;">Why it's built this way</h3>
+    <ul style="margin:14px 0 0; padding-left:20px; display:flex; flex-direction:column; gap:11px; font-size:14.5px; color:var(--ink-soft);">
+      <li><b style="color:var(--ink);">Nothing to install except Cline.</b> The model runs as a managed Azure deployment — no GPU on your laptop.</li>
+      <li><b style="color:var(--ink);">An Azure endpoint, not a public consumer AI site.</b> Easier to allow on corporate networks, and your prompts stay inside the program's Azure subscription.</li>
+      <li><b style="color:var(--ink);">The same model for every lab.</b> What works in Lab 1 works the same way in the capstone.</li>
+    </ul>
+  </div>
+
+  <div class="rpm-box">
+    <div class="eyebrow">One class, one model</div>
+    <h3>Share it fairly and it stays fast for everyone.</h3>
+    <p style="font-size:14.5px; color:color-mix(in srgb, var(--blueprint-ink) 90%, transparent); margin-top:6px;">The whole room uses the same model deployment. A few habits keep it responsive:</p>
+    <ol>
+      <li><b>A new Cline task for each job.</b> Smaller context means a faster answer for you and more capacity for everyone else.</li>
+      <li><b>Small, specific tasks.</b> "Implement evaluate.py as specified" beats "build everything again".</li>
+      <li><b>If you see "429" or "rate limit",</b> wait a moment and retry — do not click retry ten times.</li>
+      <li><b>Never paste secrets or confidential plant data</b> into a prompt.</li>
+    </ol>
+  </div>
+</section>
+
+<section>
+  <div class="pull">
+    <p>Cline is not short of capability.</p>
+    <p class="dim">It is short of decisions you have not yet made.</p>
+    <p class="cap">Every KPI you benchmarked on Day 1 — specific energy consumption, potline current efficiency, cast &amp; rolling yield — is a decision waiting to be written down as a value, not an adjective. You just did exactly that for the potline energy alert above — and your capstone does it for your own Day-1 KPI.</p>
+  </div>
+</section>
+
+</div>
+</main>
+
+<footer>Hindalco (ABG) CDS/YDP · AI Engineer Program · Physical/Classroom Track — Day 3 &amp; 4 field guide</footer>
+
+<script>
+(function(){
+  try{
+    // ---- scrollspy ----
+    var links = Array.prototype.slice.call(document.querySelectorAll('#navlinks a'));
+    var sections = links.map(function(a){ return document.querySelector(a.getAttribute('href')); }).filter(Boolean);
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        if(e.isIntersecting){
+          links.forEach(function(a){ a.classList.remove('active'); });
+          var match = links.find(function(a){ return a.getAttribute('href') === '#' + e.target.id; });
+          if(match) match.classList.add('active');
+        }
+      });
+    }, {rootMargin:'-40% 0px -50% 0px'});
+    sections.forEach(function(s){ io.observe(s); });
+
+    // ---- flip cards ----
+    document.querySelectorAll('[data-flip]').forEach(function(card){
+      var btn = card.querySelector('.flip-btn');
+      btn.addEventListener('click', function(){
+        card.classList.toggle('flipped');
+        btn.setAttribute('aria-pressed', card.classList.contains('flipped') ? 'true':'false');
+      });
+    });
+
+    // ---- stage + lab data ----
+    var STORE_KEY = 'hindalco-vibe-stage-progress';
+    var done = {};
+    try{ done = JSON.parse(localStorage.getItem(STORE_KEY) || '{}'); }catch(e){ done = {}; }
+
+    var stages = [
+      {
+        id:'s1', n:'01', t:'Vision', q:'Why does this exist at all?', hl:false,
+        d:'The one-line business rationale that every later document expands on.',
+        lab:{type:'concept', what:'Potline example: one sentence on why a potline energy alert should exist at all.',
+          why:'Lab 1: the first line of your spec — <b>predict which animal is in a photo, with a confidence score</b>. Capstone: your KPI and problem from the Day-1 Charter.',
+          output:'Top of specs/animal_classifier_spec.md', check:'Could this sentence justify saying no to a feature someone suggests later?'}
+      },
+      {
+        id:'s2', n:'02', t:'PRD', q:'What problem are we solving?', hl:false,
+        d:'Business intent, users, goals, success metrics — enough for a manager to agree it is worth building.',
+        lab:{type:'concept', what:'Potline example: a one-page PRD — users, goals, 2–3 success metrics.',
+          why:'Lab 1: goal + success metric (test accuracy ≥ 0.70). Capstone: Exhibit A — business and model success metrics.',
+          output:'specs/… (goal and metrics section) · exhibits/A_problem_brief.md', check:'Would the plant manager agree this is the real problem?'}
+      },
+      {
+        id:'s3', n:'03', t:'Feature Specification', q:'What should the system do?', hl:true, note:'Half of what a classic SRS used to be.',
+        d:'Workflows, business rules, edge cases and acceptance criteria — one feature per file.',
+        lab:{type:'concept', what:'Potline example: turn &quot;notify the engineer on a breach&quot; into actor, flow and exceptions — and catch what Cline guessed.',
+          why:'Lab 1: the rules — folder name = label, never hard-code the classes, 80/20 split with seed 42, reject unreadable images.',
+          output:'specs/animal_classifier_spec.md (rules section)', check:'What would Cline have guessed if we had not written these rules down?'}
+      },
+      {
+        id:'s4', n:'04', t:'Architecture', q:'Where does the code belong?', hl:false,
+        d:'Service boundaries and infrastructure choices, reviewable before a line of code exists.',
+        lab:{type:'concept', what:'Potline example: decide where the threshold rule lives — rules engine, not dashboard.',
+          why:'Lab 1: one shared model_utils.py used by train, evaluate and score, so training and prediction prepare images the same way; the Azure files are fixed and must not change.',
+          output:'src/model_utils.py · azureml/', check:'Could the endpoint and the laptop give different answers for the same photo? Why not?'}
+      },
+      {
+        id:'s5', n:'05', t:'Technical Design', q:'Exactly how should it behave?', hl:true, note:'The other half of the classic SRS — this is the layer that pays.',
+        d:'APIs, data models, validations, state transitions, error handling, non-functional limits.',
+        lab:{type:'concept', what:'Potline example: the exact acknowledge-alert contract — request, response, every error code.',
+          why:'Lab 1: exact arguments (--train_data, --model_dir…), the saved files (model.pt + classes.json) and the endpoint contract: {&quot;image&quot;: base64} → {&quot;animal&quot;, &quot;confidence&quot;, &quot;all_scores&quot;}.',
+          output:'The PHASE 2 section of the prompt', check:'Which of these values, if left vague, would break Azure ML later?'}
+      },
+      {
+        id:'s6', n:'06', t:'Implementation Tasks', q:'What code needs writing?', hl:false,
+        d:'Numbered, scoped units an agent can be handed one at a time.',
+        lab:{type:'concept', what:'Potline example: 3–4 numbered tasks, each testable on its own.',
+          why:'Lab 1: PHASE 2 lists one file per job — prep, train, evaluate, predict, score, make_request, tests, app.',
+          output:'src/ · tests/ · app/', check:'Could a teammate rebuild evaluate.py from its one line in the prompt?'}
+      },
+      {
+        id:'s7', n:'07', t:'AI Coding (Vibe Coding)', q:'Who writes the first draft?', hl:false,
+        d:'Cline implements against one scoped task. This only works because six stages of ambiguity are already gone.',
+        lab:{type:'concept', what:'Potline example: Act mode, one task at a time, reject changes outside the task.',
+          why:'Lab 1: Cline writes the files. You watch each change — and reject anything that touches azureml/ or azure-pipelines.yml.',
+          output:'Your working code', check:'Did Cline change a file the prompt said not to touch?'}
+      },
+      {
+        id:'s8', n:'08', t:'Tests', q:'How do we know it works?', hl:false,
+        d:'Tests generated from the spec — not from the code Cline just wrote — catch what the implementation quietly skipped.',
+        lab:{type:'concept', what:'Potline example: tests written from the spec\'s error list, not from the code.',
+          why:'Lab 1: PHASE 3 runs pytest and the scripts; AC1–AC9 become PASS/FAIL with evidence.',
+          output:'specs/validation_report.md', check:'Is there evidence for every acceptance criterion — not just &quot;it ran&quot;?'}
+      },
+      {
+        id:'s9', n:'09', t:'Review', q:'Would a human sign this off?', hl:false,
+        d:'AI-generated code still needs a human reviewer before it merges — your PR-review checkpoint.',
+        lab:{type:'concept', what:'Potline example: swap laptops and review another team\'s diff against the spec.',
+          why:'Lab 1: you read the spec before Cline continues and check the report yourself. Capstone: the Reviewer role and the daily Review Board.',
+          output:'Your review notes · exhibits/', check:'Would you sign this off for a shared plant-floor tool?'}
+      }
+    ];
+
+    var nav = document.getElementById('stepperNav');
+    var panelsWrap = document.getElementById('stepperPanels');
+
+    function renderNav(){
+      nav.innerHTML = '';
+      stages.forEach(function(s, i){
+        var b = document.createElement('button');
+        b.className = 'step-btn' + (s.hl ? ' highlight' : '') + (done[s.id] ? ' done' : '');
+        b.innerHTML = '<b>'+s.n+'</b>' + s.t + (done[s.id] ? ' <span class="chk">✓</span>' : '');
+        b.dataset.i = i;
+        nav.appendChild(b);
+      });
+    }
+
+    function escapeAttr(str){ return String(str).replace(/"/g,'&quot;'); }
+
+    function renderPanels(){
+      panelsWrap.innerHTML = '';
+      stages.forEach(function(s, i){
+        var p = document.createElement('div');
+        p.className = 'step-panel';
+        var labTagClass = 'code';
+        var labTagText = 'CONCEPT → YOUR LAB';
+        var stepsHtml = s.lab.steps ? '<h5>How to run it</h5><ol class="lab-steps">' + s.lab.steps.map(function(st){return '<li>'+st+'</li>';}).join('') + '</ol>' : '';
+        var promptHtml = s.lab.prompt ? '<h5>Prompt to paste into Cline</h5><div class="prompt-box"><pre>'+s.lab.prompt+'</pre><button class="copy-btn" data-copy="'+escapeAttr(s.lab.prompt)+'">Copy</button></div>' : '';
+        p.innerHTML =
+          '<h3>'+s.t+'</h3><div class="q">'+s.q+'</div><p class="desc">'+s.d+'</p>' +
+          (s.note ? '<div class="step-note">'+s.note+'</div>' : '') +
+          '<div class="lab-block">' +
+            '<div class="lab-row"><span class="lab-tag '+labTagClass+'">'+labTagText+'</span></div>' +
+            '<h5>The idea, on the potline example</h5><p class="lab-what">'+s.lab.what+'</p>' +
+            '<h5>Where you meet it in Lab 1 and the capstone</h5><p class="lab-why">'+s.lab.why+'</p>' +
+            stepsHtml + promptHtml +
+            '<div class="lab-output">→ '+s.lab.output+'</div>' +
+            '<div class="lab-check">Check yourself: '+s.lab.check+'</div>' +
+            '<label class="lab-complete"><input type="checkbox" data-stage="'+s.id+'" '+(done[s.id]?'checked':'')+'> I understand this stage</label>' +
+          '</div>';
+        panelsWrap.appendChild(p);
+      });
+    }
+
+    function updateProgress(){
+      var total = stages.length;
+      var c = stages.filter(function(s){ return !!done[s.id]; }).length;
+      var pct = Math.round((c/total)*100);
+      document.getElementById('progText').textContent = c + '/' + total + ' stages';
+      document.getElementById('progRing').style.setProperty('--pct', pct);
+    }
+
+    function selectStage(i){
+      Array.prototype.forEach.call(nav.children, function(b,idx){ b.classList.toggle('active', idx===i); });
+      Array.prototype.forEach.call(panelsWrap.children, function(p,idx){ p.classList.toggle('active', idx===i); });
+    }
+
+    renderNav();
+    renderPanels();
+    updateProgress();
+    selectStage(0);
+
+    nav.addEventListener('click', function(e){
+      var b = e.target.closest('.step-btn');
+      if(!b) return;
+      selectStage(parseInt(b.dataset.i,10));
+    });
+
+    panelsWrap.addEventListener('change', function(e){
+      var cb = e.target.closest('input[type=checkbox][data-stage]');
+      if(!cb) return;
+      done[cb.dataset.stage] = cb.checked;
+      try{ localStorage.setItem(STORE_KEY, JSON.stringify(done)); }catch(err){}
+      renderNav();
+      updateProgress();
+      var activeIdx = Array.prototype.indexOf.call(panelsWrap.children, e.target.closest('.step-panel'));
+      selectStage(activeIdx);
+    });
+
+    panelsWrap.addEventListener('click', function(e){
+      var btn = e.target.closest('.copy-btn');
+      if(!btn) return;
+      var text = btn.getAttribute('data-copy');
+      var orig = btn.textContent;
+      function flash(msg){ btn.textContent = msg; setTimeout(function(){ btn.textContent = orig; }, 1200); }
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(text).then(function(){ flash('Copied'); }).catch(function(){ flash('Select & copy'); });
+      } else { flash('Select & copy'); }
+    });
+
+    // ---- file tree ----
+    var treeData = {
+      'specs/': [
+        ['animal_classifier_spec.md','The contract Cline writes first: goal, rules, model, files, arguments, acceptance criteria AC1–AC9.'],
+        ['validation_report.md','Evidence that every acceptance criterion passed — written by Cline in PHASE 3, checked by you.']
+      ],
+      'src/': [
+        ['model_utils.py','Shared helpers: build MobileNetV2, prepare an image, save/load, predict. One source of truth for training and serving.'],
+        ['prep.py','Checks the photos and splits each class 80% train / 20% test.'],
+        ['train.py','Transfer learning: trains only the final layer; --from_scratch for the experiment.'],
+        ['evaluate.py','The exam: accuracy, confusion matrix and the 70% quality gate.'],
+        ['predict.py','Predicts one photo on your laptop.'],
+        ['score.py','The same prediction packaged for the Azure ML endpoint: init() and run().'],
+        ['make_request.py','Turns a photo into the JSON body the endpoint expects.']
+      ],
+      'tests/': [
+        ['test_data.py','Checks the image folders before any training — the first guardrail.']
+      ],
+      'app/': [
+        ['app.py','The Streamlit page a user opens: upload a photo, see the prediction from the live endpoint.']
+      ],
+      'azureml/': [
+        ['train-job.yml','One tracked cloud job: prep → train → evaluate.'],
+        ['pipeline.yml','The same work as a 3-step Azure ML pipeline.'],
+        ['endpoint.yml · deployment.yml','The live prediction address and the model running behind it.'],
+        ['environment.yml · conda.yml','The software recipe Azure installs.']
+      ],
+      'data/animals/': [
+        ['cat/ chicken/ cow/ dog/ horse/','Folder name = label. Adding elephant/ and pushing starts the automatic retrain.']
+      ],
+      './': [
+        ['azure-pipelines.yml','The Azure DevOps robot: test → upload data → pipeline → register → deploy.'],
+        ['README.md','How to run every step — written by Cline, checked by you.']
+      ]
+    };
+    var tree = document.getElementById('tree');
+    var preview = document.getElementById('preview');
+    var rootUl = document.createElement('ul');
+    Object.keys(treeData).forEach(function(folder){
+      var li = document.createElement('li');
+      var fb = document.createElement('button');
+      fb.className = 'folder-btn';
+      fb.innerHTML = '<span class="chev">▸</span>📁 ' + folder;
+      var childUl = document.createElement('ul');
+      childUl.hidden = true;
+      treeData[folder].forEach(function(pair){
+        var fli = document.createElement('li');
+        var filebtn = document.createElement('button');
+        filebtn.className = 'file-btn';
+        filebtn.innerHTML = '<span class="file-dot">·</span> ' + pair[0];
+        filebtn.addEventListener('click', function(){
+          document.querySelectorAll('.file-btn').forEach(function(x){ x.classList.remove('active'); });
+          filebtn.classList.add('active');
+          preview.innerHTML = '<span class="ph">'+ folder + pair[0] +'</span><span class="pd">'+ pair[1] +'</span>';
+        });
+        fli.appendChild(filebtn);
+        childUl.appendChild(fli);
+      });
+      fb.addEventListener('click', function(){
+        fb.classList.toggle('open');
+        childUl.hidden = !fb.classList.contains('open');
+      });
+      li.appendChild(fb); li.appendChild(childUl);
+      rootUl.appendChild(li);
+    });
+    tree.appendChild(rootUl);
+    var firstFolderBtn = tree.querySelector('.folder-btn');
+    if(firstFolderBtn) firstFolderBtn.click();
+
+  }catch(err){ /* fail quiet, page still reads fine statically */ }
+})();
+</script>
